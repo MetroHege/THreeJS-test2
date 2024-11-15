@@ -1,5 +1,6 @@
-import { defineConfig } from 'vite';
-import { viteStaticCopy } from 'vite-plugin-static-copy';
+import { defineConfig } from "vite";
+import { viteStaticCopy } from "vite-plugin-static-copy";
+import basicSsl from "@vitejs/plugin-basic-ssl";
 
 export default defineConfig({
   root: "three-dev",
@@ -9,11 +10,13 @@ export default defineConfig({
     assetsDir: "assets",
     rollupOptions: {
       output: {
-        assetFileNames: 'assets/[name].[ext]',
+        assetFileNames: "assets/[name].[ext]",
       },
     },
   },
   plugins: [
+    basicSsl(),
+    //base: '/~ullamu/xr/',
     viteStaticCopy({
       targets: [
         { src: "models/*", dest: "assets/models" },
@@ -21,5 +24,5 @@ export default defineConfig({
       ],
     }),
   ],
-  assetsInclude: ['**/*.glb', '**/*.png'],
+  assetsInclude: ["**/*.glb", "**/*.png"],
 });
