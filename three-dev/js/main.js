@@ -45,8 +45,13 @@ function init() {
   const axesHelper = new THREE.AxesHelper(20);
   scene.add(axesHelper);
 
+  // Create a new empty group to include imported models you want to interact with
+  group = new THREE.Group();
+  group.name = "Interaction-Group";
+  scene.add(group);
+
   // Load models
-  loadModels(scene);
+  loadModels(group);
 
   // Set up environment (sky, lighting) with renderer passed as a parameter
   setupEnvironment(scene, renderer);
@@ -64,6 +69,10 @@ function init() {
 
   // Set animation loop
   renderer.setAnimationLoop(function () {
+    cleanIntersected();
+    intersectObjects(controller1);
+    intersectObjects(controller2);
+    controls.update();
     renderer.render(scene, camera);
   });
 }
@@ -96,6 +105,9 @@ function initVR() {
   scene.add(controllerGrip1);
 
   controllerGrip2 = renderer.xr.getControllerGrip(1);
+  controllerGrip2.add(
+    controllerModelFactory.createControllerModel(controllerGrip2)
+  );
   scene.add(controllerGrip2);
 
   const geometry = new THREE.BufferGeometry().setFromPoints([
@@ -125,9 +137,72 @@ function initVR() {
 }
 
 function onSelectStart(event) {
-  // Handle select start event
+  const controller = event.target;
+  const intersections = getIntersections(controller);
+
+  if (intersections.length > 0) {
+    const intersection = intersections[0];
+    const object = intersection.object;
+    object.material.emissive.b = 1;
+    controller.attach(object);
+    controller.userData.selected = object;
+    console.log("Object selected:", object);
+  } else {
+    console.log("No intersections found");
+  }
+
+  controller.userData.targetRayMode = event.data.targetRayMode;
 }
 
 function onSelectEnd(event) {
-  // Handle select end event
+  const controller = event.target;
+
+  if (controller.userData.selected !== undefined) {
+    const object = controller.userData.selected;
+    object.material.emissive.b = 0;
+    group.attach(object);
+    controller.userData.selected = undefined;
+    console.log("Object released:", object);
+  }
+}
+
+function getIntersections(controller) {
+  // Update the raycaster to use the controller's position and direction
+  const tempMatrix = new THREE.Matrix4();
+  tempMatrix.identity().extractRotation(controller.matrixWorld);
+
+  raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+  raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+
+  const intersections = raycaster.intersectObjects(group.children, true);
+
+  // Filter out non-grabbable objects
+  return intersections.filter(
+    (intersection) => intersection.object.userData.grabbable !== false
+  );
+}
+
+function intersectObjects(controller) {
+  if (controller.userData.targetRayMode === "screen") return;
+  if (controller.userData.selected !== undefined) return;
+
+  const line = controller.getObjectByName("line");
+  const intersections = getIntersections(controller);
+
+  if (intersections.length > 0) {
+    const intersection = intersections[0];
+    const object = intersection.object;
+    object.material.emissive.r = 1;
+    intersected.push(object);
+    line.scale.z = intersection.distance;
+  } else {
+    line.scale.z = 5;
+  }
+}
+
+function cleanIntersected() {
+  while (intersected.length) {
+    const object = intersected.pop();
+    object.material.emissive.r = 0;
+  }
 }
