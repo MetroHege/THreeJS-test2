@@ -77,7 +77,6 @@ function init() {
   renderer.setAnimationLoop(function () {
     cleanIntersected();
     intersectObjects(controller1);
-    intersectObjects(controller2);
     controls.update();
     renderer.render(scene, camera);
   });
@@ -98,16 +97,11 @@ function initVR() {
   scene.add(controller1);
 
   controller2 = renderer.xr.getController(1);
-  controller2.addEventListener("selectstart", onSelectStart);
-  controller2.addEventListener("selectend", onSelectEnd);
   scene.add(controller2);
 
   const controllerModelFactory = new XRControllerModelFactory();
 
   controllerGrip1 = renderer.xr.getControllerGrip(0);
-  controllerGrip1.add(
-    controllerModelFactory.createControllerModel(controllerGrip1)
-  );
   scene.add(controllerGrip1);
 
   controllerGrip2 = renderer.xr.getControllerGrip(1);
@@ -129,16 +123,16 @@ function initVR() {
 
   raycaster = new THREE.Raycaster();
 
-  // Load and add custom model to controllerGrip2
+  // Load and add custom model to controllerGrip1 (left controller)
   const basePath = "assets/models/"; // Adjust the base path as needed
   const loader = new GLTFLoader().setPath(basePath);
-  loader.load("gundy.gltf", function (gltf) {
-    gltf.scene.scale.set(0.0003, 0.0003, 0.0003);
-    let mymodel = gltf.scene;
-    mymodel.rotation.y = THREE.MathUtils.degToRad(180);
-    mymodel.rotation.x = THREE.MathUtils.degToRad(-36.5);
-    mymodel.position.set(0, 0.01, 0);
-    controllerGrip2.add(mymodel);
+  loader.load("gundy.glb", function (gltf) {
+    const gundyModel = gltf.scene;
+    gundyModel.scale.set(0.0005, 0.0005, 0.0005); // Adjust the scale as needed
+    gundyModel.rotation.y = THREE.MathUtils.degToRad(180);
+    gundyModel.rotation.x = THREE.MathUtils.degToRad(-36.5);
+    gundyModel.position.set(0, 0.01, 0);
+    controllerGrip1.add(gundyModel);
   });
 }
 

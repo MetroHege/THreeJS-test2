@@ -1,7 +1,7 @@
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as THREE from "three";
 
-export function loadModels(grabbableGroup, nonGrabbableGroup) {
+export function loadModels(grabbableGroup, nonGrabbableGroup, callback) {
   const photogrammetryLoader = new GLTFLoader();
   photogrammetryLoader.load("assets/models/hippo-textured2.glb", (gltf) => {
     const photogrammetryModel = gltf.scene;
