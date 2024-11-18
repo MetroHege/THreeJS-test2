@@ -12,7 +12,7 @@ let controllerGrip1, controllerGrip2;
 let raycaster;
 const intersected = [];
 const tempMatrix = new THREE.Matrix4();
-let group;
+let grabbableGroup, nonGrabbableGroup;
 
 init();
 
@@ -45,13 +45,19 @@ function init() {
   const axesHelper = new THREE.AxesHelper(20);
   scene.add(axesHelper);
 
-  // Create a new empty group to include imported models you want to interact with
-  group = new THREE.Group();
-  group.name = "Interaction-Group";
-  scene.add(group);
+  // Create groups for grabbable and non-grabbable objects
+  grabbableGroup = new THREE.Group();
+  grabbableGroup.name = "Grabbable-Group";
+  grabbableGroup.userData.grabbable = true;
+  scene.add(grabbableGroup);
+
+  nonGrabbableGroup = new THREE.Group();
+  nonGrabbableGroup.name = "Non-Grabbable-Group";
+  nonGrabbableGroup.userData.grabbable = false;
+  scene.add(nonGrabbableGroup);
 
   // Load models
-  loadModels(group);
+  loadModels(grabbableGroup, nonGrabbableGroup);
 
   // Set up environment (sky, lighting) with renderer passed as a parameter
   setupEnvironment(scene, renderer);
@@ -160,7 +166,7 @@ function onSelectEnd(event) {
   if (controller.userData.selected !== undefined) {
     const object = controller.userData.selected;
     object.material.emissive.b = 0;
-    group.attach(object);
+    grabbableGroup.attach(object);
     controller.userData.selected = undefined;
     console.log("Object released:", object);
   }
@@ -174,12 +180,12 @@ function getIntersections(controller) {
   raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
   raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
 
-  const intersections = raycaster.intersectObjects(group.children, true);
-
-  // Filter out non-grabbable objects
-  return intersections.filter(
-    (intersection) => intersection.object.userData.grabbable !== false
+  const intersections = raycaster.intersectObjects(
+    grabbableGroup.children,
+    true
   );
+
+  return intersections;
 }
 
 function intersectObjects(controller) {
