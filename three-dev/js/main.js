@@ -94,6 +94,8 @@ function initVR() {
   controller1 = renderer.xr.getController(0);
   controller1.addEventListener("selectstart", onSelectStart);
   controller1.addEventListener("selectend", onSelectEnd);
+  controller1.addEventListener("squeezestart", onSqueezeStart);
+  controller1.addEventListener("squeezeend", onSqueezeEnd);
   scene.add(controller1);
 
   controller2 = renderer.xr.getController(1);
@@ -164,6 +166,27 @@ function onSelectEnd(event) {
     controller.userData.selected = undefined;
     console.log("Object released:", object);
   }
+}
+
+function onSqueezeStart(event) {
+  const controller = event.target;
+  const intersections = getIntersections(controller);
+
+  if (intersections.length > 0) {
+    const intersection = intersections[0];
+    const object = intersection.object;
+    const pushForce = new THREE.Vector3(0, 0, -1).applyMatrix4(
+      controller.matrixWorld
+    );
+    object.position.add(pushForce.multiplyScalar(10)); // Adjust the push strength as needed
+    console.log("Object pushed:", object);
+  } else {
+    console.log("No intersections found");
+  }
+}
+
+function onSqueezeEnd(event) {
+  // You can add any additional logic for when the squeeze ends, if needed
 }
 
 function getIntersections(controller) {
