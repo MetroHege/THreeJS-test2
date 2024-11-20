@@ -178,6 +178,8 @@ function onSelectStart(event) {
     const intersection = intersections[0];
     const object = intersection.object;
     object.material.emissive.b = 1;
+    object.material.transparent = true;
+    object.material.opacity = 0.5; // Set opacity to 50%
     controller.attach(object);
     controller.userData.selected = object;
     console.log("Object selected:", object);
@@ -195,6 +197,7 @@ function onSelectEnd(event) {
   if (controller.userData.selected !== undefined) {
     const object = controller.userData.selected;
     object.material.emissive.b = 0;
+    object.material.opacity = 1; // Reset opacity to 100%
     grabbableGroup.attach(object);
     controller.userData.selected = undefined;
     console.log("Object released:", object);
