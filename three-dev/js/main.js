@@ -79,6 +79,7 @@ function init() {
   renderer.setAnimationLoop(function () {
     cleanIntersected();
     intersectObjects(controller1);
+    intersectObjects(controller2);
     updateTeleportation();
     controls.update();
     renderer.render(scene, camera);
@@ -97,13 +98,15 @@ function initVR() {
   controller1 = renderer.xr.getController(0);
   controller1.addEventListener("selectstart", onSelectStart);
   controller1.addEventListener("selectend", onSelectEnd);
-  controller1.addEventListener("squeezestart", onSqueezeStart);
-  controller1.addEventListener("squeezeend", onSqueezeEnd);
+  controller1.addEventListener("squeezestart", onTeleportStart);
+  controller1.addEventListener("squeezeend", onTeleportEnd);
   scene.add(controller1);
 
   controller2 = renderer.xr.getController(1);
-  controller2.addEventListener("squeezestart", onTeleportStart);
-  controller2.addEventListener("squeezeend", onTeleportEnd);
+  controller2.addEventListener("selectstart", onRightSelectStart);
+  controller2.addEventListener("selectend", onRightSelectEnd);
+  controller2.addEventListener("squeezestart", onRightSqueezeStart);
+  controller2.addEventListener("squeezeend", onRightSqueezeEnd);
   scene.add(controller2);
 
   const controllerModelFactory = new XRControllerModelFactory();
@@ -198,36 +201,13 @@ function onSelectEnd(event) {
   }
 }
 
-function onSqueezeStart(event) {
-  console.log("Squeeze start on left controller");
-  const controller = event.target;
-  const intersections = getIntersections(controller);
-
-  if (intersections.length > 0) {
-    const intersection = intersections[0];
-    const object = intersection.object;
-    const pushForce = new THREE.Vector3(0, 0, -1).applyMatrix4(
-      controller.matrixWorld
-    );
-    object.position.add(pushForce.multiplyScalar(10)); // Adjust the push strength as needed
-    console.log("Object pushed:", object);
-  } else {
-    console.log("No intersections found");
-  }
-}
-
-function onSqueezeEnd(event) {
-  console.log("Squeeze end on left controller");
-  // You can add any additional logic for when the squeeze ends, if needed
-}
-
 function onTeleportStart(event) {
-  console.log("Squeeze start on right controller (teleport)");
+  console.log("Squeeze start on left controller (teleport)");
   this.userData.isSelecting = true;
 }
 
 function onTeleportEnd(event) {
-  console.log("Squeeze end on right controller (teleport)");
+  console.log("Squeeze end on left controller (teleport)");
   this.userData.isSelecting = false;
 
   if (INTERSECTION) {
@@ -256,6 +236,76 @@ function onTeleportEnd(event) {
 
       renderer.xr.setReferenceSpace(teleportSpaceOffset);
     }
+  }
+}
+
+const forceScale = 2; // Adjust this value to scale the push/pull force
+
+function onRightSelectStart(event) {
+  console.log("Select start on right controller (push)");
+  const controller = event.target;
+  const intersections = getIntersections(controller);
+
+  if (intersections.length > 0) {
+    const intersection = intersections[0];
+    const object = intersection.object;
+    object.material.emissive.b = 1;
+    controller.userData.selected = object;
+    console.log("Object selected for push:", object);
+  } else {
+    console.log("No intersections found");
+  }
+
+  controller.userData.targetRayMode = event.data.targetRayMode;
+}
+
+function onRightSelectEnd(event) {
+  console.log("Select end on right controller (push)");
+  const controller = event.target;
+
+  if (controller.userData.selected !== undefined) {
+    const object = controller.userData.selected;
+    object.material.emissive.b = 0;
+    const pushVector = new THREE.Vector3(0, 0, -1)
+      .applyQuaternion(controller.quaternion)
+      .multiplyScalar(forceScale);
+    object.position.add(pushVector); // Push away
+    controller.userData.selected = undefined;
+    console.log("Object pushed:", object);
+  }
+}
+
+function onRightSqueezeStart(event) {
+  console.log("Squeeze start on right controller (pull)");
+  const controller = event.target;
+  const intersections = getIntersections(controller);
+
+  if (intersections.length > 0) {
+    const intersection = intersections[0];
+    const object = intersection.object;
+    object.material.emissive.b = 1;
+    controller.userData.selected = object;
+    console.log("Object selected for pull:", object);
+  } else {
+    console.log("No intersections found");
+  }
+
+  controller.userData.targetRayMode = event.data.targetRayMode;
+}
+
+function onRightSqueezeEnd(event) {
+  console.log("Squeeze end on right controller (pull)");
+  const controller = event.target;
+
+  if (controller.userData.selected !== undefined) {
+    const object = controller.userData.selected;
+    object.material.emissive.b = 0;
+    const pullVector = new THREE.Vector3(0, 0, 1)
+      .applyQuaternion(controller.quaternion)
+      .multiplyScalar(forceScale);
+    object.position.add(pullVector); // Pull towards
+    controller.userData.selected = undefined;
+    console.log("Object pulled:", object);
   }
 }
 
@@ -303,10 +353,10 @@ function cleanIntersected() {
 function updateTeleportation() {
   INTERSECTION = undefined;
 
-  if (controller2.userData.isSelecting === true) {
-    tempMatrix.identity().extractRotation(controller2.matrixWorld);
+  if (controller1.userData.isSelecting === true) {
+    tempMatrix.identity().extractRotation(controller1.matrixWorld);
 
-    raycaster.ray.origin.setFromMatrixPosition(controller2.matrixWorld);
+    raycaster.ray.origin.setFromMatrixPosition(controller1.matrixWorld);
     raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
 
     const intersects = raycaster.intersectObjects([floor]);
