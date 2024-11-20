@@ -9,10 +9,12 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 let camera, scene, renderer;
 let controller1, controller2;
 let controllerGrip1, controllerGrip2;
-let raycaster;
+let raycaster, heightRaycaster;
 const intersected = [];
 const tempMatrix = new THREE.Matrix4();
 let grabbableGroup, nonGrabbableGroup;
+let marker, floor, baseReferenceSpace;
+let INTERSECTION;
 
 init();
 
@@ -77,6 +79,7 @@ function init() {
   renderer.setAnimationLoop(function () {
     cleanIntersected();
     intersectObjects(controller1);
+    updateTeleportation();
     controls.update();
     renderer.render(scene, camera);
   });
@@ -99,6 +102,8 @@ function initVR() {
   scene.add(controller1);
 
   controller2 = renderer.xr.getController(1);
+  controller2.addEventListener("squeezestart", onTeleportStart);
+  controller2.addEventListener("squeezeend", onTeleportEnd);
   scene.add(controller2);
 
   const controllerModelFactory = new XRControllerModelFactory();
@@ -124,6 +129,7 @@ function initVR() {
   controller2.add(line.clone());
 
   raycaster = new THREE.Raycaster();
+  heightRaycaster = new THREE.Raycaster();
 
   // Load and add custom model to controllerGrip1 (left controller)
   const basePath = "assets/models/"; // Adjust the base path as needed
@@ -136,9 +142,32 @@ function initVR() {
     gundyModel.position.set(0, 0.01, 0);
     controllerGrip1.add(gundyModel);
   });
+
+  // Initialize teleportation marker and floor
+  marker = new THREE.Mesh(
+    new THREE.CircleGeometry(0.25, 32).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color: 0xbcbcbc })
+  );
+  scene.add(marker);
+
+  floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(50, 50, 2, 2).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({
+      color: 0xbcbcbc,
+      transparent: true,
+      opacity: 0,
+    })
+  );
+  scene.add(floor);
+
+  renderer.xr.addEventListener(
+    "sessionstart",
+    () => (baseReferenceSpace = renderer.xr.getReferenceSpace())
+  );
 }
 
 function onSelectStart(event) {
+  console.log("Select start on left controller");
   const controller = event.target;
   const intersections = getIntersections(controller);
 
@@ -157,6 +186,7 @@ function onSelectStart(event) {
 }
 
 function onSelectEnd(event) {
+  console.log("Select end on left controller");
   const controller = event.target;
 
   if (controller.userData.selected !== undefined) {
@@ -169,6 +199,7 @@ function onSelectEnd(event) {
 }
 
 function onSqueezeStart(event) {
+  console.log("Squeeze start on left controller");
   const controller = event.target;
   const intersections = getIntersections(controller);
 
@@ -186,7 +217,46 @@ function onSqueezeStart(event) {
 }
 
 function onSqueezeEnd(event) {
+  console.log("Squeeze end on left controller");
   // You can add any additional logic for when the squeeze ends, if needed
+}
+
+function onTeleportStart(event) {
+  console.log("Squeeze start on right controller (teleport)");
+  this.userData.isSelecting = true;
+}
+
+function onTeleportEnd(event) {
+  console.log("Squeeze end on right controller (teleport)");
+  this.userData.isSelecting = false;
+
+  if (INTERSECTION) {
+    // Use heightRaycaster to find the highest point at the teleportation location
+    heightRaycaster.set(
+      new THREE.Vector3(INTERSECTION.x, 100, INTERSECTION.z),
+      new THREE.Vector3(0, -1, 0)
+    );
+    const heightIntersections = heightRaycaster.intersectObjects(
+      scene.children,
+      true
+    );
+
+    if (heightIntersections.length > 0) {
+      const highestPoint = heightIntersections[0].point;
+      const offsetPosition = {
+        x: -highestPoint.x,
+        y: -highestPoint.y,
+        z: -highestPoint.z,
+        w: 1,
+      };
+      const offsetRotation = new THREE.Quaternion();
+      const transform = new XRRigidTransform(offsetPosition, offsetRotation);
+      const teleportSpaceOffset =
+        baseReferenceSpace.getOffsetReferenceSpace(transform);
+
+      renderer.xr.setReferenceSpace(teleportSpaceOffset);
+    }
+  }
 }
 
 function getIntersections(controller) {
@@ -228,4 +298,25 @@ function cleanIntersected() {
     const object = intersected.pop();
     object.material.emissive.r = 0;
   }
+}
+
+function updateTeleportation() {
+  INTERSECTION = undefined;
+
+  if (controller2.userData.isSelecting === true) {
+    tempMatrix.identity().extractRotation(controller2.matrixWorld);
+
+    raycaster.ray.origin.setFromMatrixPosition(controller2.matrixWorld);
+    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+
+    const intersects = raycaster.intersectObjects([floor]);
+
+    if (intersects.length > 0) {
+      INTERSECTION = intersects[0].point;
+    }
+  }
+
+  if (INTERSECTION) marker.position.copy(INTERSECTION);
+
+  marker.visible = INTERSECTION !== undefined;
 }
